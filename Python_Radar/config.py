@@ -1,0 +1,46 @@
+"""
+TRINETRA Python Tactical Radar Display Configuration
+"""
+
+import os
+
+# ESP32 SoftAP Network Settings
+ESP32_HOST = os.getenv("TRINETRA_IP", "192.168.4.1")
+ESP32_PORT = 80
+BASE_URL = f"http://{ESP32_HOST}:{ESP32_PORT}"
+
+# API Endpoints
+DATA_ENDPOINT = f"{BASE_URL}/data"
+LOCK_ENDPOINT = f"{BASE_URL}/lock"
+UNLOCK_ENDPOINT = f"{BASE_URL}/unlock"
+START_RADAR_ENDPOINT = f"{BASE_URL}/radar/start"
+STOP_RADAR_ENDPOINT = f"{BASE_URL}/radar/stop"
+
+# Radar Sensor Constraints
+MIN_RADAR_ANGLE = 0
+MAX_RADAR_ANGLE = 180
+MAX_RADAR_DISTANCE = 250   # cm
+TARGET_THRESHOLD = 150     # cm
+
+# Network Update Rate
+POLL_INTERVAL_SEC = 0.1    # 10 Hz
+
+# Display Window Settings
+WINDOW_WIDTH = 950
+WINDOW_HEIGHT = 700
+FPS = 60
+
+# Tactical Color Scheme (RGB)
+COLOR_BG = (1, 8, 4)
+COLOR_PANEL_BG = (2, 20, 10)
+COLOR_BORDER = (0, 255, 136, 120)
+COLOR_GRID = (0, 255, 136, 60)
+COLOR_GRID_TEXT = (0, 200, 100)
+COLOR_BEAM = (0, 255, 136)
+COLOR_TRAIL = (0, 180, 80)
+COLOR_TARGET = (255, 51, 51)
+COLOR_TEXT_TITLE = (0, 255, 136)
+COLOR_TEXT_VAL = (255, 255, 255)
+COLOR_TEXT_MUTED = (0, 170, 85)
+COLOR_WARN = (255, 153, 0)
+COLOR_DANGER = (255, 51, 51)
