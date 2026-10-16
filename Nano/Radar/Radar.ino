@@ -1,9 +1,14 @@
 #include <Arduino.h>
 #include <Servo.h>
+#include <SoftwareSerial.h>
 
 #define TRIG_PIN 7
 #define ECHO_PIN 8
 #define SERVO_PIN 9
+
+// Nano पर SoftwareSerial के लिए Pins (आप इन्हें बदल भी सकते हैं)
+#define NANO_RX_PIN 2
+#define NANO_TX_PIN 3
 
 #define MIN_ANGLE 0
 #define MAX_ANGLE 180
@@ -13,6 +18,7 @@
 #define SERVO_DELAY 30
 
 Servo radarServo;
+SoftwareSerial espSerial(NANO_RX_PIN, NANO_TX_PIN); // ESP32 से बात करने के लिए
 
 int angleNow = 0;
 int direction = 1;
@@ -23,11 +29,9 @@ bool radarRunning = true;
 
 String commandBuffer;
 
-
 // =====================================================
 // ULTRASONIC
 // =====================================================
-
 long readDistance()
 {
   digitalWrite(TRIG_PIN, LOW);
@@ -38,8 +42,7 @@ long readDistance()
 
   digitalWrite(TRIG_PIN, LOW);
 
-  unsigned long duration =
-    pulseIn(ECHO_PIN, HIGH, 30000UL);
+  unsigned long duration = pulseIn(ECHO_PIN, HIGH, 30000UL);
 
   if (duration == 0)
     return MAX_DISTANCE;
@@ -52,26 +55,23 @@ long readDistance()
   return distance;
 }
 
-
 // =====================================================
-// RADAR DATA
+// RADAR DATA (ESP32 को भेजना)
 // =====================================================
-
 void sendRadar()
 {
   long distance = readDistance();
 
-  Serial.print("RADAR,");
-  Serial.print(angleNow);
-  Serial.print(",");
-  Serial.println(distance);
+  // ESP32 को डेटा भेजना (SoftwareSerial के ज़रिए)
+  espSerial.print("RADAR,");
+  espSerial.print(angleNow);
+  espSerial.print(",");
+  espSerial.println(distance);
 }
-
 
 // =====================================================
 // LOCK
 // =====================================================
-
 void lockRadar(int angle)
 {
   angle = constrain(angle, 0, 180);
@@ -82,61 +82,58 @@ void lockRadar(int angle)
 
   radarServo.write(lockedAngle);
 
-  Serial.print("RADAR_LOCKED,");
+  Serial.println(F("========================================"));
+  Serial.print(F("[NANO DEBUG] Radar Locked at: "));
   Serial.println(lockedAngle);
-}
+  Serial.println(F("========================================"));
 
+  espSerial.print("RADAR_LOCKED,");
+  espSerial.println(lockedAngle);
+}
 
 // =====================================================
 // UNLOCK
 // =====================================================
-
 void unlockRadar()
 {
   locked = false;
 
   if (angleNow >= MAX_ANGLE)
     direction = -1;
-
   else if (angleNow <= MIN_ANGLE)
     direction = 1;
 
-  Serial.println("RADAR_UNLOCKED");
+  Serial.println(F("========================================"));
+  Serial.println(F("[NANO DEBUG] Radar Unlocked"));
+  Serial.println(F("========================================"));
+
+  espSerial.println("RADAR_UNLOCKED");
 }
 
-
 // =====================================================
-// COMMAND
+// COMMAND PROCESSOR
 // =====================================================
-
 void processCommand(String command)
 {
   command.trim();
-
   if (command.length() == 0)
     return;
 
-
-  Serial.print("CMD:");
-
+  Serial.println(F("----------------------------------------"));
+  Serial.print(F("[NANO RECEIVED ← ESP32]: "));
   Serial.println(command);
-
+  Serial.println(F("----------------------------------------"));
 
   if (command.startsWith("LOCK:"))
   {
-    int angle =
-      command.substring(5).toInt();
-
+    int angle = command.substring(5).toInt();
     lockRadar(angle);
-
     return;
   }
-
 
   if (command == "UNLOCK")
   {
     unlockRadar();
-
     return;
   }
 
@@ -144,7 +141,8 @@ void processCommand(String command)
   {
     radarRunning = false;
     locked = false;
-    Serial.println("RADAR_STOPPED");
+    Serial.println(F("[NANO DEBUG] Radar Stopped"));
+    espSerial.println("RADAR_STOPPED");
     return;
   }
 
@@ -152,47 +150,42 @@ void processCommand(String command)
   {
     radarRunning = true;
     locked = false;
-    Serial.println("RADAR_STARTED");
+    Serial.println(F("[NANO DEBUG] Radar Started"));
+    espSerial.println("RADAR_STARTED");
     return;
   }
 }
 
-
 // =====================================================
-// READ ESP32 COMMAND
+// READ COMMAND FROM ESP32
 // =====================================================
-
 void readCommands()
 {
-  while (Serial.available())
+  while (espSerial.available())
   {
-    char c = Serial.read();
+    char c = espSerial.read();
 
     if (c == '\n')
     {
       processCommand(commandBuffer);
-
       commandBuffer = "";
     }
-
     else if (c != '\r')
     {
       commandBuffer += c;
-
       if (commandBuffer.length() > 32)
         commandBuffer = "";
     }
   }
 }
 
-
 // =====================================================
 // SETUP
 // =====================================================
-
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(115200);      // कंप्यूटर पर मॉनिटर देखने के लिए (115200)
+  espSerial.begin(9600);    // ESP32 के साथ कम्यूनिकेशन के लिए (9600)
 
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
@@ -201,83 +194,58 @@ void setup()
 
   angleNow = 0;
   direction = 1;
-
   radarServo.write(0);
 
   delay(500);
 
-  Serial.println("NANO_RADAR_READY");
+  Serial.println(F("========================================"));
+  Serial.println(F("[BOOT] NANO RADAR READY (SoftwareSerial)"));
+  Serial.println(F("========================================"));
 }
-
 
 // =====================================================
 // LOOP
 // =====================================================
-
 void loop()
 {
   readCommands();
 
-  // If radar scanning is stopped, pause sweep and measurement
   if (!radarRunning)
   {
     delay(50);
     return;
   }
 
-  // ================================================
-  // LOCKED
-  // ================================================
-
   if (locked)
   {
     radarServo.write(lockedAngle);
-
     angleNow = lockedAngle;
-
     sendRadar();
-
     delay(100);
-
     return;
   }
 
-
-  // ================================================
-  // NORMAL RADAR SWEEP
-  // ================================================
-
   radarServo.write(angleNow);
-
   delay(SERVO_DELAY);
 
-
   readCommands();
-
 
   if (locked)
     return;
 
-
   sendRadar();
 
-
-  angleNow +=
-    direction * STEP_ANGLE;
-
+  angleNow += direction * STEP_ANGLE;
 
   if (angleNow >= MAX_ANGLE)
   {
     angleNow = MAX_ANGLE;
-
     direction = -1;
   }
-
 
   if (angleNow <= MIN_ANGLE)
   {
     angleNow = MIN_ANGLE;
-
     direction = 1;
   }
 }

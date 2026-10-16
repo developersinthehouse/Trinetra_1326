@@ -24,14 +24,15 @@ CamSrc& currentCam(){ return activeCam ? CAM_BACK : CAM_FRONT; }
 
 // Aapke bataye gaye naye pin mappings ke anusار:
 // RedRat (Radar): TX to RX0 (Pin 3), aur TX0 (Pin 1)
-#define RADAR_RX 3   // RX0
-#define RADAR_TX 1   // TX0
+#define RADAR_RX 22  // D22 को RX बनाएं
+#define RADAR_TX 23  // D23 को TX बनाएं
+
+HardwareSerial RadarSerial(1); // UART1 का उपयोग करें (UART0 को हाथ न लगाएं)
 
 // Uno: RX to TX2 (Pin 17), aur TX to RX2 (Pin 16)
 #define UNO_RX 16    // RX2
 #define UNO_TX 17    // TX2
 
-HardwareSerial RadarSerial(0); // UART0 for RX0/TX0
 HardwareSerial UnoSerial(2);   // UART2 for RX2/TX2
 
 String radarLine, unoLine;
@@ -574,6 +575,7 @@ void setup(){
     server.send(200,"text/plain","OK");
   });
   server.on("/camera",[]{
+
     logHttp("/camera");
     if(!server.hasArg("src")){
       server.send(200,"text/plain", activeCam ? "back" : "front");
